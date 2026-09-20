@@ -1,0 +1,6 @@
+{
+  "name": "Fuel Splitter",
+  "description": "Modern road trip fuel estimator and expense splitting tool with reactive calculations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
