@@ -3,27 +3,21 @@ package com.example.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -45,10 +39,8 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Route
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -89,8 +81,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.TripPreset
@@ -198,18 +188,6 @@ fun FuelEstimatorScreen(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
-        },
-        bottomBar = {
-            // Persistent High-Contrast Breakdown Bar: ALWAYS visible on screen
-            StickyTripCostBottomBar(
-                uiState = uiState,
-                onShare = { copySummaryToClipboard() },
-                onScrollToBreakdown = {
-                    scope.launch {
-                        scrollState.animateScrollTo(scrollState.maxValue)
-                    }
-                }
-            )
         }
     ) { innerPadding ->
         Column(
@@ -226,13 +204,19 @@ fun FuelEstimatorScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Unit System Segmented Button Row (Miles / Kilometers)
+                // 1. Unit System Segmented Button Row (Miles / Kilometers)
                 UnitSystemSelector(
                     selectedUnit = uiState.unitSystem,
                     onUnitSelected = { viewModel.setUnitSystem(it) }
                 )
 
-                // Input Section Card
+                // 2. High-Contrast Trip Cost Breakdown: Positioned prominently so results are visible immediately!
+                OutputDashboardSection(
+                    uiState = uiState,
+                    onCopySummary = { copySummaryToClipboard() }
+                )
+
+                // 3. Input Section Card
                 InputsCard(
                     distance = uiState.distance,
                     fuelEconomy = uiState.fuelEconomy,
@@ -247,13 +231,7 @@ fun FuelEstimatorScreen(
                     onSetPassengers = viewModel::setPassengers
                 )
 
-                // Output Dashboard Section: Placed immediately after parameters so it is directly visible!
-                OutputDashboardSection(
-                    uiState = uiState,
-                    onCopySummary = { copySummaryToClipboard() }
-                )
-
-                // Quick Trip Presets
+                // 4. Quick Trip Presets
                 TripPresetsSection(
                     unitSystem = uiState.unitSystem,
                     onSelectPreset = { preset ->
@@ -262,158 +240,7 @@ fun FuelEstimatorScreen(
                     }
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
-            }
-        }
-    }
-}
-
-/**
- * Persistent high-contrast sticky bottom dock that highlights the calculation breakdown live at all times.
- */
-@Composable
-fun StickyTripCostBottomBar(
-    uiState: FuelEstimatorUiState,
-    onShare: () -> Unit,
-    onScrollToBreakdown: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val result = uiState.calculationResult
-    val isDark = isSystemInDarkTheme()
-
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag("sticky_trip_cost_bottom_bar")
-            .clickable { onScrollToBreakdown() },
-        color = if (isDark) Color(0xFF102327) else Color(0xFFE3F6F8),
-        tonalElevation = 8.dp,
-        shadowElevation = 8.dp,
-        border = BorderStroke(
-            1.5.dp,
-            if (result.isValid) HighlightGlowTeal else MaterialTheme.colorScheme.outlineVariant
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Left side: Total Trip Cost
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(if (result.isValid) HighlightGlowTeal else MaterialTheme.colorScheme.outline)
-                        )
-                        Text(
-                            text = "TOTAL COST",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.8.sp
-                            ),
-                            color = if (isDark) HighlightGlowTeal else PrimaryLight
-                        )
-                    }
-
-                    Text(
-                        text = if (result.isValid) formatCurrency(result.totalCost) else "$--.--",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.ExtraBold
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.testTag("sticky_total_cost_text")
-                    )
-
-                    if (result.isValid && result.fuelNeeded > 0) {
-                        Text(
-                            text = "${String.format(Locale.US, "%.1f", result.fuelNeeded)} ${uiState.unitSystem.fuelUnitPlural}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                // Vertical Divider
-                Box(
-                    modifier = Modifier
-                        .height(38.dp)
-                        .width(1.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                )
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                // Right side: Each Person Owes
-                Column(
-                    modifier = Modifier.weight(1.3f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(if (result.isValid) HighlightGlowAmber else MaterialTheme.colorScheme.outline)
-                        )
-                        Text(
-                            text = if (uiState.passengers == 1) "SOLO TRIP" else "${uiState.passengers}-WAY SPLIT",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.8.sp
-                            ),
-                            color = if (isDark) HighlightGlowAmber else SecondaryLight
-                        )
-                    }
-
-                    Text(
-                        text = if (result.isValid) "${formatCurrency(result.costPerPerson)} each" else "$--.-- each",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Black
-                        ),
-                        color = if (isDark) HighlightGlowAmber else SecondaryLight,
-                        modifier = Modifier.testTag("sticky_split_cost_text")
-                    )
-
-                    Text(
-                        text = "Tap to view full breakdown ▾",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // Share Button
-                if (result.isValid && result.totalCost > 0.0) {
-                    IconButton(
-                        onClick = onShare,
-                        modifier = Modifier
-                            .testTag("sticky_share_button")
-                            .size(38.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "Share breakdown",
-                            tint = if (isDark) HighlightGlowAmber else MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
+                Spacer(modifier = Modifier.height(36.dp))
             }
         }
     }
@@ -755,33 +582,24 @@ fun PassengersStepperSection(
                         shape = CircleShape,
                         colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            disabledContentColor = MaterialTheme.colorScheme.outline
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Remove,
+                            imageVector = Icons.Default.Clear,
                             contentDescription = "Decrease passengers",
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
 
-                    Box(
+                    Text(
+                        text = "$passengers",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         modifier = Modifier
-                            .widthIn(min = 40.dp)
+                            .padding(horizontal = 8.dp)
                             .testTag("passenger_count_text"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "$passengers",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            ),
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
 
                     FilledIconButton(
                         onClick = onIncrement,
@@ -839,12 +657,11 @@ fun PassengersStepperSection(
 }
 
 /**
- * Output Dashboard: Prominently displays the visual breakdown of trip costs:
- * 1. Live Status & Header with Share action
+ * Output Dashboard: High-contrast, highlighted hero section showing:
+ * 1. LIVE TRIP BREAKDOWN banner with 1-tap Copy/Share
  * 2. Visual Trip Expense Journey Flow
- * 3. Visual Passenger Split Visualizer (Avatar & Share grid)
- * 4. High-Contrast 'Total Trip Cost' Card
- * 5. High-Contrast 'Each Passenger Owes' Card
+ * 3. Hero 'Each Passenger Owes' Card with equal split visualization
+ * 4. 'Total Trip Cost' & Metrics Card
  */
 @Composable
 fun OutputDashboardSection(
@@ -859,7 +676,7 @@ fun OutputDashboardSection(
         modifier = modifier
             .fillMaxWidth()
             .animateContentSize(),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Prominent Header with Live Status Tag
         Row(
@@ -874,7 +691,7 @@ fun OutputDashboardSection(
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = if (isDark) HighlightBadgeBgDark else HighlightBadgeBgLight,
-                    border = BorderStroke(1.dp, if (isDark) HighlightGlowTeal else PrimaryLight)
+                    border = BorderStroke(1.2.dp, if (isDark) HighlightGlowAmber else SecondaryLight)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -884,7 +701,7 @@ fun OutputDashboardSection(
                         Icon(
                             imageVector = Icons.Default.Bolt,
                             contentDescription = null,
-                            tint = if (isDark) HighlightGlowTeal else PrimaryLight,
+                            tint = if (isDark) HighlightGlowAmber else SecondaryLight,
                             modifier = Modifier.size(14.dp)
                         )
                         Text(
@@ -893,7 +710,7 @@ fun OutputDashboardSection(
                                 fontWeight = FontWeight.ExtraBold,
                                 letterSpacing = 0.5.sp
                             ),
-                            color = if (isDark) HighlightGlowTeal else PrimaryLight
+                            color = if (isDark) HighlightGlowAmber else SecondaryLight
                         )
                     }
                 }
@@ -913,7 +730,7 @@ fun OutputDashboardSection(
                     Icon(
                         imageVector = Icons.Default.ContentCopy,
                         contentDescription = "Copy trip summary",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = if (isDark) HighlightGlowAmber else MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -957,34 +774,24 @@ fun OutputDashboardSection(
                 isDark = isDark
             )
 
-            // 2. Visual Passenger Split Visualizer (Avatars & Equal Shares)
-            if (uiState.passengers > 1) {
-                VisualPassengerSplitCard(
-                    passengers = uiState.passengers,
-                    costPerPerson = result.costPerPerson,
-                    totalCost = result.totalCost,
-                    isDark = isDark
-                )
-            }
+            // 2. Hero Card: EACH PASSENGER OWES (with equal passenger split visualization)
+            EachPassengerOwesCard(
+                costPerPerson = result.costPerPerson,
+                passengers = uiState.passengers,
+                totalCost = result.totalCost,
+                isDark = isDark,
+                onCopySummary = onCopySummary
+            )
+
+            // 3. Result Card: TOTAL TRIP COST (High-Contrast Petroleum/Teal Card)
+            TotalTripCostCard(
+                totalCost = result.totalCost,
+                fuelNeeded = result.fuelNeeded,
+                costPerUnit = result.costPerUnitDistance,
+                unitSystem = uiState.unitSystem,
+                isDark = isDark
+            )
         }
-
-        // 3. Result Card 1: TOTAL TRIP COST (High-Contrast Petroleum/Teal Card)
-        TotalTripCostCard(
-            totalCost = if (result.isValid) result.totalCost else 0.0,
-            fuelNeeded = if (result.isValid) result.fuelNeeded else 0.0,
-            costPerUnit = if (result.isValid) result.costPerUnitDistance else 0.0,
-            unitSystem = uiState.unitSystem,
-            isDark = isDark
-        )
-
-        // 4. Result Card 2: EACH PASSENGER OWES (High-Contrast Golden/Amber Hero Card)
-        EachPassengerOwesCard(
-            costPerPerson = if (result.isValid) result.costPerPerson else 0.0,
-            passengers = uiState.passengers,
-            totalCost = if (result.isValid) result.totalCost else 0.0,
-            isDark = isDark,
-            onCopySummary = onCopySummary
-        )
     }
 }
 
@@ -1005,13 +812,13 @@ fun VisualExpenseFlowCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         color = if (isDark) Color(0xFF142427) else Color(0xFFEFFBFC),
         border = BorderStroke(1.dp, if (isDark) HighlightGlowTeal.copy(alpha = 0.4f) else PrimaryLight.copy(alpha = 0.3f))
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
                 text = "CALCULATION FLOW",
@@ -1040,7 +847,7 @@ fun VisualExpenseFlowCard(
                 Icon(
                     imageVector = Icons.Default.ArrowForward,
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.outline
                 )
 
@@ -1055,7 +862,7 @@ fun VisualExpenseFlowCard(
                 Icon(
                     imageVector = Icons.Default.ArrowForward,
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.outline
                 )
 
@@ -1070,7 +877,7 @@ fun VisualExpenseFlowCard(
                 Icon(
                     imageVector = Icons.Default.ArrowForward,
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.outline
                 )
 
@@ -1096,7 +903,7 @@ private fun FlowStepItem(
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, color.copy(alpha = 0.4f))
+        border = BorderStroke(1.dp, color.copy(alpha = 0.35f))
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -1125,155 +932,6 @@ private fun FlowStepItem(
     }
 }
 
-/**
- * Visual Passenger Split Card showing visual avatars and equal slices of the road trip bill.
- */
-@Composable
-fun VisualPassengerSplitCard(
-    passengers: Int,
-    costPerPerson: Double,
-    totalCost: Double,
-    isDark: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag("visual_passenger_split_card"),
-        shape = RoundedCornerShape(16.dp),
-        color = if (isDark) Color(0xFF281E0C) else Color(0xFFFFF9ED),
-        border = BorderStroke(1.2.dp, if (isDark) HighlightGlowAmber.copy(alpha = 0.5f) else SplitCardBorderLight)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.People,
-                        contentDescription = null,
-                        tint = if (isDark) HighlightGlowAmber else SecondaryLight,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = "EQUAL PASSENGER SPLIT",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
-                        ),
-                        color = if (isDark) HighlightGlowAmber else SecondaryLight
-                    )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = if (isDark) Color(0xFF4A3414) else Color(0xFFFFE0B2)
-                ) {
-                    Text(
-                        text = "$passengers Travelers",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = if (isDark) HighlightGlowAmber else SecondaryLight,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-            }
-
-            // Proportional Multi-Segment Progress Bar (each passenger gets equal slice)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(5.dp)),
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                val segmentColors = listOf(
-                    HighlightGlowTeal,
-                    HighlightGlowAmber,
-                    Color(0xFF81C784),
-                    Color(0xFFBA68C8),
-                    Color(0xFFFF8A65),
-                    Color(0xFF4DD0E1)
-                )
-                for (i in 0 until passengers) {
-                    val color = segmentColors[i % segmentColors.size]
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxSize()
-                            .background(color)
-                    )
-                }
-            }
-
-            // Passenger Chips / Share Visuals
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                for (i in 1..passengers) {
-                    val isDriver = (i == 1)
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(
-                            1.dp,
-                            if (isDriver) (if (isDark) HighlightGlowAmber else SecondaryLight)
-                            else MaterialTheme.colorScheme.outlineVariant
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = if (isDriver) (if (isDark) Color(0xFF4A3414) else Color(0xFFFFE0B2))
-                                else MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.Person,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(14.dp),
-                                        tint = if (isDriver) (if (isDark) HighlightGlowAmber else SecondaryLight)
-                                        else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            Column {
-                                Text(
-                                    text = if (isDriver) "Driver ($i)" else "Person $i",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = formatCurrency(costPerPerson),
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = if (isDark) HighlightGlowAmber else SecondaryLight
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 fun TotalTripCostCard(
     totalCost: Double,
@@ -1293,12 +951,12 @@ fun TotalTripCostCard(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = bgColor),
         border = BorderStroke(2.dp, borderColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
@@ -1407,7 +1065,7 @@ fun EachPassengerOwesCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
@@ -1466,6 +1124,98 @@ fun EachPassengerOwesCard(
                 color = if (isDark) HighlightGlowAmber else MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.testTag("each_passenger_owes_value")
             )
+
+            // Integrated Passenger Split Visualizer (if > 1 traveler)
+            if (passengers > 1) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("visual_passenger_split_card"),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.65f),
+                    border = BorderStroke(1.dp, borderColor.copy(alpha = 0.5f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Multi-segment progress bar showing equal shares
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            val segmentColors = listOf(
+                                HighlightGlowTeal,
+                                HighlightGlowAmber,
+                                Color(0xFF81C784),
+                                Color(0xFFBA68C8),
+                                Color(0xFFFF8A65),
+                                Color(0xFF4DD0E1)
+                            )
+                            for (i in 0 until passengers) {
+                                val color = segmentColors[i % segmentColors.size]
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxSize()
+                                        .background(color)
+                                        .clip(RoundedCornerShape(2.dp))
+                                )
+                            }
+                        }
+
+                        // Passenger Chips
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            for (i in 1..passengers) {
+                                val isDriver = (i == 1)
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (isDriver) (if (isDark) HighlightGlowAmber else SecondaryLight)
+                                        else MaterialTheme.colorScheme.outlineVariant
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Person,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(12.dp),
+                                            tint = if (isDriver) (if (isDark) HighlightGlowAmber else SecondaryLight)
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = if (isDriver) "Driver (1)" else "Person $i",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = formatCurrency(costPerPerson),
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            color = if (isDark) HighlightGlowAmber else SecondaryLight
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             HorizontalDivider(
                 color = borderColor.copy(alpha = 0.5f),
@@ -1600,4 +1350,3 @@ private fun formatTripSummary(state: FuelEstimatorUiState): String {
         appendLine("• Split (${state.passengers} travelers): ${formatCurrency(res.costPerPerson)} each")
     }
 }
-
